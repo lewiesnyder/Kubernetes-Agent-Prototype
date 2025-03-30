@@ -1,0 +1,32 @@
+auth:
+  conainers:
+    args:
+      - --enable-insecure-login
+      - --enable-skip-login
+      - --disable-settings-authorizer
+      - --auto-generate-certificates
+
+extraArgs:
+  - --enable-skip-login
+  - --disable-settings-authorizer
+  - --enable-insecure-login
+  - --insecure-bind-address=0.0.0.0
+  - --insecure-port=9090
+
+enableInsecureLogin: true
+enableSkipLogin: true
+protocolHttp: true
+
+service:
+  externalPort: 80
+  internalPort: 9090
+
+
+app:
+  containers:
+    args:
+      - --enable-skip-login
+      - --disable-settings-authorizer
+      - --enable-insecure-login
+      - --insecure-bind-address=0.0.0.0
+      - --insecure-port=9090

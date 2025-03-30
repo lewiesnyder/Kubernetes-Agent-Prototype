@@ -1,0 +1,32 @@
+# Cluster configuration for Kind (Kubernetes in Docker)
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+nodes:
+  # Control plane node
+  - role: control-plane
+    image: kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72
+    extraPortMappings:
+    - containerPort: 80
+      hostPort: 80
+      protocol: TCP
+    - containerPort: 443
+      hostPort: 443
+      protocol: TCP
+    # For mounting local directories
+    extraMounts:
+    - hostPath: ./manifests
+      containerPath: /manifests
+
+  # Worker nodes (optional - add more as needed)
+  - role: worker
+    image: kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72
+  - role: worker
+    image: kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72
+
+# Configure networking (optional)
+networking:
+  apiServerPort: 6443
+  disableDefaultCNI: false
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12" 

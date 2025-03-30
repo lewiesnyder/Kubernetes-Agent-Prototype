@@ -1,0 +1,124 @@
+/* Add styles for tool call display */
+.tool-call-content {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 4px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  overflow-x: auto;
+}
+
+.tool-call-content pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.tool-call-content code {
+  display: block;
+  color: #333;
+}
+
+/* Output result styling */
+.output-result-container {
+  margin: 16px 0 24px 0;
+  align-self: flex-start;
+  max-width: 80%; /* Match message bubble width */
+}
+
+.output-result {
+  margin-top: 0 !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  width: 100% !important;
+}
+
+.output-title {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #495057;
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 8px;
+}
+
+.output-content {
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-all; /* Break anywhere if needed */
+  overflow-wrap: break-word;
+  padding: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Text output styling */
+.text-output {
+  display: none;
+}
+
+/* For images in output content */
+.output-content img {
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+/* Conversation styling */
+.conversation-unit {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.conversation-unit:last-child {
+  border-bottom: none;
+}
+
+/* Remove the unneeded styles */
+/* For long text content that needs to break */
+.text-output code, .text-output pre {
+  display: inline-block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Remove the old extracted output styles that are no longer needed */
+.extracted-output {
+  display: none;
+}
+
+/* Character wrapper for text breaking */
+.char-wrapper {
+  display: none;
+}
+
+/* Text output pre styling - simpler approach */
+.text-output-pre {
+  margin: 0;
+  padding: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+  border: none;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Output content wrapper */
+.output-content-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: break-word;
+} 

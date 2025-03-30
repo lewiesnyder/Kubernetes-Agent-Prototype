@@ -1,0 +1,34 @@
+[project]
+name = "container_agent"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "lewiesnyder",email = "80827300+lewiesnyder@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = "^3.11"
+dependencies = [
+    "litellm (>=1.64.1,<2.0.0)",
+    "docker (>=7.1.0,<8.0.0)",
+    "kubernetes (>=29.0.0,<30.0.0)",
+    "ollama (>=0.4.7,<0.5.0)",
+    "py-dotenv (>=0.1,<0.2)",
+    "ujson (>=5.10.0,<6.0.0)",
+    "yfinance (>=0.2.55,<0.3.0)",
+    "matplotlib (>=3.10.1,<4.0.0)",
+    "anthropic (>=0.49.0,<0.50.0)",
+    "openai (>=1.69.0,<2.0.0)",
+    "nest-asyncio (>=1.6.0,<2.0.0)",
+    "fastapi (>=0.115.12,<0.116.0)",
+    "uvicorn (>=0.34.0,<0.35.0)",
+    "sse-starlette (>=2.2.1,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.1.1"
+
