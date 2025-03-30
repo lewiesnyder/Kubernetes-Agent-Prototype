@@ -214,7 +214,26 @@ class K8sTool:
         K8sTool.logger.info(f"Executing python code in pod {pod_name}")
         # escaped = python_code.replace("'", "\\'").replace('\\n', '\\r')
         escaped = python_code
+        output_buffer = ""
+        capturing_output = False
+
         async for chunk in K8sTool.execute_command_async(pod_name=pod_name, exec_cmd=['python', '-c', f'{escaped}'], ns=ns):
+            if chunk['type'] == 'stdout':
+                if '%%START_OUTPUT%%' in chunk['data']:
+                    capturing_output = True
+                    output_buffer += chunk['data'].split('%%START_OUTPUT%%', 1)[1]
+                    continue
+
+                if capturing_output:
+                    if '%%END_OUTPUT%%' in chunk['data']:
+                        output_buffer += chunk['data'].split('%%END_OUTPUT%%', 1)[0]
+                        yield {'type': 'tool_output', 'data': output_buffer, 'stage': 'execute_python'}
+                        output_buffer = ""
+                        capturing_output = False
+                    else:
+                        output_buffer += chunk['data']
+                    continue
+
             chunk['stage'] = 'execute_python'
             yield chunk
         

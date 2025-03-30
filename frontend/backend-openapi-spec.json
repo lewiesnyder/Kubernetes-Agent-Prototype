@@ -8,6 +8,7 @@
         "/chat": {
             "post": {
                 "summary": "Chat",
+                "description": "Chat with the container agent.\n\nArgs:\n    request: The request object.\n    response: The response object.\n    body: The chat request body.\n\nReturns:\n    The event source response.",
                 "operationId": "chat_chat_post",
                 "requestBody": {
                     "content": {
@@ -121,6 +122,21 @@
                     "content": {
                         "type": "string",
                         "title": "Content"
+                    },
+                    "tool_calls": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "additionalProperties": true,
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tool Calls"
                     }
                 },
                 "type": "object",
@@ -179,6 +195,11 @@
                         "data": "stderr data",
                         "stage": "stderr_event",
                         "type": "stderr"
+                    },
+                    {
+                        "data": "data:image/png;base64,iVB...",
+                        "stage": "execute_python",
+                        "type": "tool_output"
                     }
                 ]
             },

@@ -37,5 +37,6 @@ export enum EventType {
   Response = "response",
   ToolCall = "tool_call",
   Stdout = "stdout",
-  Stderr = "stderr"
+  Stderr = "stderr",
+  ToolOutput = "tool_output"
 }

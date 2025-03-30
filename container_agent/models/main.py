@@ -4,6 +4,7 @@ from typing import Optional
 class Message(BaseModel):
     role: str
     content: str
+    tool_calls: Optional[list[dict]] = None
 
 
 class ChatRequest(BaseModel):
@@ -46,6 +47,10 @@ class ResponseEvents(RootModel):
                     "data": "stderr data",
                     "stage": "stderr_event"
                 },
-                
+                {
+                    "type":"tool_output",
+                    "data":"data:image/png;base64,iVB...",
+                    "stage":"execute_python"
+                }
             ]
         }

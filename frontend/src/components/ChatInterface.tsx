@@ -18,6 +18,7 @@ import {
 interface ChatMessage {
   role: string;
   content: string;
+  tool_calls?: ToolCall[];
 }
 
 interface ExecutionOutput {
@@ -25,6 +26,7 @@ interface ExecutionOutput {
   title: string;
   logs: { type: string; content: string }[];
   extractedOutput?: string;
+  toolOutput?: string;
   conversationId?: number;
 }
 
@@ -295,9 +297,16 @@ const ChatInterface: React.FC = () => {
       // After streaming is done, add the complete response
       // Use the ref value which is more reliable than the state
       if (currentResponseRef.current) {
+        // Get tool calls for this conversation
+        const conversationToolCalls = toolCalls.filter(tool => 
+          tool.conversationId === newConversationId
+        );
+        
         const assistantMessage: ChatMessage = { 
           role: 'assistant', 
-          content: currentResponseRef.current 
+          content: currentResponseRef.current,
+          // Only include tool_calls if we have any
+          ...(conversationToolCalls.length > 0 && { tool_calls: conversationToolCalls })
         };
         
         setMessages(prev => {
@@ -360,6 +369,42 @@ const ChatInterface: React.FC = () => {
       } catch (e) {
         console.error('Error parsing tool call data:', e);
       }
+    }
+    else if (type === EventType.ToolOutput) {
+      // Handle tool_output type events - add to the current execution
+      const executionStage = `Tool Output: ${stage}`;
+      
+      setExecutions(prev => {
+        // Generate a stable execution ID for tool output
+        const executionKey = `tool-output-${stage}-${currentConversationId}`;
+        
+        // Check if we already have a tool output execution for this stage
+        const existingExecIndex = prev.findIndex(exec => 
+          exec.title === executionStage && 
+          exec.conversationId === currentConversationId
+        );
+        
+        if (existingExecIndex >= 0) {
+          // Update existing execution
+          const updated = [...prev];
+          
+          // Store the tool output
+          updated[existingExecIndex].toolOutput = data;
+          
+          return updated;
+        } else {
+          // Create new execution with unique ID for this tool output
+          const newExecution: ExecutionOutput = {
+            id: `exec-${executionKey}-${Date.now()}`,
+            title: executionStage,
+            logs: [],
+            toolOutput: data,
+            conversationId: currentConversationId
+          };
+          
+          return [...prev, newExecution];
+        }
+      });
     }
     else if (
       stage === EventStage.InstallDependencies || 
@@ -674,6 +719,37 @@ const ChatInterface: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Display tool output if available */}
+                  {execution.toolOutput && (
+                    <div className="output-result-container">
+                      <div className="message assistant-message output-result">
+                        <h4 className="output-title">{execution.title}</h4>
+                        <div className="output-content-wrapper">
+                          {execution.toolOutput.trim().startsWith('data:image/') ? (
+                            <img 
+                              src={execution.toolOutput} 
+                              alt="Tool output" 
+                              className="output-image" 
+                            />
+                          ) : execution.toolOutput.trim().startsWith('data:') ? (
+                            <a 
+                              href={execution.toolOutput} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="output-link"
+                            >
+                              Download File
+                            </a>
+                          ) : (
+                            <div className="markdown-content">
+                              {execution.toolOutput}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </React.Fragment>
               ))
             }
@@ -682,6 +758,21 @@ const ChatInterface: React.FC = () => {
             {unit.assistantMessage && (
               <div className="message assistant-message">
                 {unit.assistantMessage.content}
+                
+                {/* Display tool calls from the assistant message if available */}
+                {unit.assistantMessage.tool_calls && unit.assistantMessage.tool_calls.length > 0 && (
+                  <div className="assistant-tool-calls">
+                    {unit.assistantMessage.tool_calls.map((tool) => (
+                      <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`} defaultOpen={false}>
+                        <div className="tool-call-content">
+                          <pre><code>
+                            {`### ${tool.name}\n\n\`\`\`json\n${JSON.stringify(JSON.parse(tool.args), null, 2)}\n\`\`\``}
+                          </code></pre>
+                        </div>
+                      </CollapsibleSection>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

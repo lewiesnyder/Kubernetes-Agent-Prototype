@@ -23,5 +23,7 @@ async def chat(body: ChatRequest) -> EventSourceResponse:
         async for event in K8sAgent().chat(body):
             yield event
 
+        yield '[DONE]'
+
     return EventSourceResponse(stream_response(), media_type="text/event-stream")
     

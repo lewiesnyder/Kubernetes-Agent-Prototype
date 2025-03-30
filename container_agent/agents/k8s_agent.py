@@ -21,6 +21,7 @@ class K8sAgent:
         tool_calls: dict[int, dict[str, str]] = {}
 
         for chunk in resp:
+            # print(chunk)
             for choice in chunk.choices:
                 if hasattr(choice, 'delta'):
                     if hasattr(choice.delta, 'content') and choice.delta.content:
