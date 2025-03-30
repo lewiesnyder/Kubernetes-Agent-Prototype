@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, ReactElement } from 'react';
 import { EventType } from '../types';
 
 interface OutputLogProps {
@@ -7,6 +7,7 @@ interface OutputLogProps {
 }
 
 const OutputLog: React.FC<OutputLogProps> = ({ type, content }) => {
+  const [processedContent, setProcessedContent] = useState<string | React.ReactNode>(content);
   const logClass = type === EventType.Stderr ? 'output-log stderr' : 'output-log stdout';
 
   // Helper function to check if a string is a data URL
@@ -19,47 +20,64 @@ const OutputLog: React.FC<OutputLogProps> = ({ type, content }) => {
     return dataUrl.startsWith('data:image/');
   };
 
+  // Process content when it changes
+  useEffect(() => {
+    processContent();
+  }, [content]);
+
   // Helper to extract content from simple data URLs in the text
-  const renderContent = () => {
-    // If content isn't a data URL, just return it as is
+  const processContent = () => {
+    // If content is empty or undefined, show a placeholder
+    if (!content || content.trim() === '') {
+      setProcessedContent('No output available');
+      return;
+    }
+
+    // If content isn't a data URL and doesn't include any, just return it as is
     if (!content.includes('data:')) {
-      return content;
+      setProcessedContent(content);
+      return;
     }
 
     // Attempt to find data URLs in the content
     const regex = /(data:[^\s]+)/g;
-    const parts = [];
-    let lastIndex = 0;
     let match;
 
     // Find all data URLs in the content
     const matches = Array.from(content.matchAll(regex));
     
     if (matches.length === 0) {
-      return content;
+      setProcessedContent(content);
+      return;
     }
 
     // If content is only a data URL (nothing before or after), render it specially
     if (matches.length === 1 && matches[0].index === 0 && matches[0][0].length === content.trim().length) {
       const dataUrl = matches[0][0];
       if (isImageDataUrl(dataUrl)) {
-        return (
+        const element = (
           <div className="data-url-container">
             <img src={dataUrl} alt="Generated content" className="data-url-image" />
           </div>
         );
+        setProcessedContent(element);
       } else {
-        return (
+        const element = (
           <div className="data-url-container">
             <a href={dataUrl} target="_blank" rel="noopener noreferrer" className="data-url-link">
               Open Generated Content in New Tab
             </a>
           </div>
         );
+        setProcessedContent(element);
       }
+      return;
     }
     
     // Handle content with embedded data URLs
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    
     while ((match = regex.exec(content)) !== null) {
       // Add text before the match
       if (match.index > lastIndex) {
@@ -98,12 +116,12 @@ const OutputLog: React.FC<OutputLogProps> = ({ type, content }) => {
       parts.push(content.substring(lastIndex));
     }
     
-    return parts;
+    setProcessedContent(parts);
   };
 
   return (
     <div className={logClass}>
-      {renderContent()}
+      {processedContent}
     </div>
   );
 };

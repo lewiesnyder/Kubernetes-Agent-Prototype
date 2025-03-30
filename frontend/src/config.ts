@@ -25,22 +25,34 @@ export const MODELS: ModelOption[] = [
     description: "Fast and efficient Claude model"
   },
   {
-    id: "ollama/deepseek-r1:32b",
+    id: "ollama_chat/deepseek-r1:32b",
     name: "DeepSeek R1 32B",
     provider: "Ollama",
     description: "Advanced reasoning model from DeepSeek"
   },
   {
-    id: "ollama/llama3.2:latest",
+    id: "ollama_chat/llama3.2:latest",
     name: "Llama 3.2",
     provider: "Ollama",
     description: "Latest Llama model from Meta"
   },
   {
-    id: "ollama/phi4-mini:latest",
-    name: "Phi-4 Mini",
+    id: "ollama_chat/llama3-groq-tool-use:8b",
+    name: "Llama 3 Groq Tool Use",
     provider: "Ollama",
-    description: "Compact and efficient model from Microsoft"
+    description: "Llama 3 with Groq's tool use capabilities"
+  },
+  {
+    id: "ollama_chat/medragondot/Sky-T1-32B-Preview:latest",
+    name: "Sky T1 32B Preview",
+    provider: "Ollama",
+    description: "Sky T1 32B Preview model from Medragondot"
+  },
+  {
+    id: "ollama_chat/llama3.1:latest",
+    name: "Llama 3.1",
+    provider: "Ollama",
+    description: "Llama 3.1 model from Meta"
   },
   {
     id: "openai/gpt-4o",

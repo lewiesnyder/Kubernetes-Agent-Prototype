@@ -262,9 +262,11 @@ const ChatInterface: React.FC = () => {
     setStreamedResponse('');
     currentResponseRef.current = '';
     setCurrentToolCall(null);
-    // Don't reset executions and tool calls to preserve them between conversations
-    // setExecutions([]);
-    // setToolCalls([]);
+    
+    // Clear previous executions related to this conversation to ensure fresh results
+    setExecutions(prev => prev.filter(exec => exec.conversationId !== newConversationId));
+    setToolCalls(prev => prev.filter(tool => tool.conversationId !== newConversationId));
+    
     setIsLoading(true);
 
     try {
@@ -334,6 +336,11 @@ const ChatInterface: React.FC = () => {
         currentResponseRef.current = updated;
         return updated;
       });
+      
+      // Clear tool call when we get a new completion event
+      if (currentToolCall) {
+        setCurrentToolCall(null);
+      }
     } 
     else if (stage === EventStage.ToolCallEvent) {
       try {
@@ -344,7 +351,7 @@ const ChatInterface: React.FC = () => {
         setToolCalls(prev => [
           ...prev, 
           { 
-            id: `tool-${prev.length}`, 
+            id: `tool-${Date.now()}-${prev.length}`, // Add timestamp for uniqueness 
             name: toolData.name, 
             args: toolData.args,
             conversationId: currentConversationId
@@ -380,14 +387,25 @@ const ChatInterface: React.FC = () => {
           extractedOutput = data.substring(
             startIndex + startDelimiter.length, 
             endIndex
-          );
+          ).trim();
           
           // Remove the delimited content from the log
           processedData = data.replace(`${startDelimiter}${extractedOutput}${endDelimiter}`, '');
+        } else {
+          // If no delimiters but there's output, and it's stdout, consider it the extracted output
+          if (type === EventType.Stdout && data.trim()) {
+            // Only extract if it looks like meaningful output (not just status messages)
+            if (!data.includes("Running code") && !data.includes("Executing") && data.length > 5) {
+              extractedOutput = data.trim();
+            }
+          }
         }
       }
       
       setExecutions(prev => {
+        // Generate a stable execution ID for this stage and conversation
+        const executionKey = `${stage}-${currentConversationId}`;
+        
         // Check if we already have an execution for this stage in the current conversation
         const existingExecIndex = prev.findIndex(exec => 
           exec.title === executionStage && 
@@ -397,10 +415,18 @@ const ChatInterface: React.FC = () => {
         if (existingExecIndex >= 0) {
           // Update existing execution
           const updated = [...prev];
-          updated[existingExecIndex].logs.push({
-            type,
-            content: processedData
-          });
+          
+          // Ensure log entry is not duplicate
+          const isDuplicate = updated[existingExecIndex].logs.some(
+            log => log.type === type && log.content === processedData
+          );
+          
+          if (!isDuplicate && processedData.trim()) {
+            updated[existingExecIndex].logs.push({
+              type,
+              content: processedData
+            });
+          }
           
           // If we extracted output, store it
           if (extractedOutput !== null) {
@@ -409,14 +435,19 @@ const ChatInterface: React.FC = () => {
           
           return updated;
         } else {
-          // Create new execution
+          // Skip empty logs
+          if (!processedData.trim() && extractedOutput === null) {
+            return prev;
+          }
+          
+          // Create new execution with unique ID
           const newExecution: ExecutionOutput = {
-            id: `exec-${prev.length}`,
+            id: `exec-${executionKey}-${Date.now()}`,
             title: executionStage,
-            logs: [{
+            logs: processedData.trim() ? [{
               type,
               content: processedData
-            }],
+            }] : [],
             conversationId: currentConversationId
           };
           
@@ -428,10 +459,6 @@ const ChatInterface: React.FC = () => {
           return [...prev, newExecution];
         }
       });
-    }
-    // Clear tool call when we get a new completion event
-    else if (stage === EventStage.CompletionEvent && currentToolCall) {
-      setCurrentToolCall(null);
     }
   };
 
@@ -456,7 +483,8 @@ const ChatInterface: React.FC = () => {
       if (messages[i]?.role === 'user') {
         const userMessage = messages[i];
         const assistantMessage = messages[i + 1];
-        const unitId = Math.floor(i / 2) + 1; // Start from 1, but this may not match conversationCounter
+        // For historical conversations, use calculated index+1 as ID
+        const unitId = Math.floor(i / 2) + 1;
         
         units.push({
           id: unitId,
@@ -469,26 +497,82 @@ const ChatInterface: React.FC = () => {
     }
     
     // Then match executions and tool calls to their respective units
-    executions.forEach(execution => {
-      if (execution.conversationId) {
-        const targetUnit = units.find(unit => unit.id === execution.conversationId);
-        if (targetUnit) {
-          targetUnit.executions.push(execution);
+    if (units.length > 0) {
+      // Sort executions to ensure they're displayed in the correct order
+      const sortedExecutions = [...executions].sort((a, b) => {
+        // First by conversation ID
+        if (a.conversationId !== b.conversationId) {
+          return (a.conversationId || 0) - (b.conversationId || 0);
+        }
+        // Then by stage (install dependencies first)
+        if (a.title !== b.title) {
+          return a.title.includes('Installing') ? -1 : 1;
+        }
+        // Then by ID
+        return a.id.localeCompare(b.id);
+      });
+      
+      // Create a mapping from user message index to conversation unit ID
+      const messageIndexToUnitId: Record<number, number> = {};
+      for (let i = 0; i < messages.length; i += 2) {
+        if (messages[i]?.role === 'user') {
+          const unitId = Math.floor(i / 2) + 1;
+          messageIndexToUnitId[i] = unitId;
         }
       }
-    });
-    
-    toolCalls.forEach(toolCall => {
-      if (toolCall.conversationId) {
-        const targetUnit = units.find(unit => unit.id === toolCall.conversationId);
-        if (targetUnit) {
-          targetUnit.toolCalls.push(toolCall);
+      
+      // Map from conversation ID to most recent unit that should contain its executions
+      const lastUnitByConversationId: Record<number, number> = {};
+      
+      // First, establish which unit should handle which conversation ID
+      units.forEach((unit, idx) => {
+        // For the active conversation, associate with the current conversation ID
+        if (idx === units.length - 1 && currentConversationId !== null) {
+          lastUnitByConversationId[currentConversationId] = unit.id;
+        } else {
+          // Otherwise use the unit's ID
+          lastUnitByConversationId[unit.id] = unit.id;
         }
-      }
-    });
+      });
+      
+      // Distribute executions to appropriate conversation units
+      sortedExecutions.forEach(execution => {
+        if (execution.conversationId !== undefined) {
+          // Try to find the correct unit for this execution
+          const targetUnitId = lastUnitByConversationId[execution.conversationId];
+          const targetUnit = units.find(unit => unit.id === targetUnitId);
+          
+          if (targetUnit) {
+            targetUnit.executions.push(execution);
+          } else if (units.length > 0) {
+            // If we can't find a specific match, add to the most recent conversation
+            units[units.length - 1].executions.push(execution);
+          }
+        } else if (units.length > 0) {
+          // If no conversation ID, add to the most recent conversation
+          units[units.length - 1].executions.push(execution);
+        }
+      });
+      
+      // Similarly for tool calls
+      toolCalls.forEach(toolCall => {
+        if (toolCall.conversationId !== undefined) {
+          const targetUnitId = lastUnitByConversationId[toolCall.conversationId];
+          const targetUnit = units.find(unit => unit.id === targetUnitId);
+          
+          if (targetUnit) {
+            targetUnit.toolCalls.push(toolCall);
+          } else if (units.length > 0) {
+            units[units.length - 1].toolCalls.push(toolCall);
+          }
+        } else if (units.length > 0) {
+          units[units.length - 1].toolCalls.push(toolCall);
+        }
+      });
+    }
     
     return units;
-  }, [messages, executions, toolCalls]);
+  }, [messages, executions, toolCalls, currentConversationId]);
 
   return (
     <div className={`app-layout ${isConfigPanelOpen ? 'config-open' : ''} ${isHistoryPanelOpen ? 'history-open' : ''}`}>
@@ -533,16 +617,9 @@ const ChatInterface: React.FC = () => {
               {unit.userMessage.content}
             </div>
             
-            {/* Assistant message */}
-            {unit.assistantMessage && (
-              <div className="message assistant-message">
-                {unit.assistantMessage.content}
-              </div>
-            )}
-            
             {/* Tool calls for this conversation */}
-            {unit.toolCalls.map((tool) => (
-              <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`}>
+            {unit.toolCalls.length > 0 && unit.toolCalls.map((tool) => (
+              <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`} defaultOpen={true}>
                 <div className="tool-call-content">
                   <pre><code>
                     {`### ${tool.name}\n\n\`\`\`json\n${JSON.stringify(JSON.parse(tool.args), null, 2)}\n\`\`\``}
@@ -551,47 +628,62 @@ const ChatInterface: React.FC = () => {
               </CollapsibleSection>
             ))}
             
-            {/* Executions for this conversation */}
-            {unit.executions.map((execution) => (
-              <React.Fragment key={execution.id}>
-                <CollapsibleSection title={execution.title}>
-                  {execution.logs.map((log, idx) => (
-                    <OutputLog key={idx} type={log.type} content={log.content} />
-                  ))}
-                </CollapsibleSection>
-                
-                {/* Display extracted output if available */}
-                {execution.extractedOutput && (
-                  <div className="output-result-container">
-                    <div className="message assistant-message output-result">
-                      <h4 className="output-title">Output Result</h4>
-                      <div className="output-content-wrapper">
-                        {execution.extractedOutput.trim().startsWith('data:image/') ? (
-                          <img 
-                            src={execution.extractedOutput} 
-                            alt="Generated output" 
-                            className="output-image" 
-                          />
-                        ) : execution.extractedOutput.trim().startsWith('data:') ? (
-                          <a 
-                            href={execution.extractedOutput} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="output-link"
-                          >
-                            Open Generated Content
-                          </a>
-                        ) : (
-                          // <pre className="text-output-pre">
-                          <div>{execution.extractedOutput}</div>
-                        //   </pre>
-                        )}
+            {/* Executions for this conversation - sort to ensure install deps comes before python exec */}
+            {unit.executions.length > 0 && [...unit.executions]
+              .sort((a, b) => {
+                if (a.title.includes('Installing') && b.title.includes('Executing')) return -1;
+                if (a.title.includes('Executing') && b.title.includes('Installing')) return 1;
+                return 0;
+              })
+              .map((execution) => (
+                <React.Fragment key={execution.id}>
+                  {/* Only show sections with logs */}
+                  {execution.logs.length > 0 && (
+                    <CollapsibleSection title={execution.title} defaultOpen={true}>
+                      {execution.logs.map((log, idx) => (
+                        <OutputLog key={idx} type={log.type} content={log.content} />
+                      ))}
+                    </CollapsibleSection>
+                  )}
+                  
+                  {/* Display extracted output if available */}
+                  {execution.extractedOutput && (
+                    <div className="output-result-container">
+                      <div className="message assistant-message output-result">
+                        <h4 className="output-title">Output Result</h4>
+                        <div className="output-content-wrapper">
+                          {execution.extractedOutput.trim().startsWith('data:image/') ? (
+                            <img 
+                              src={execution.extractedOutput} 
+                              alt="Generated output" 
+                              className="output-image" 
+                            />
+                          ) : execution.extractedOutput.trim().startsWith('data:') ? (
+                            <a 
+                              href={execution.extractedOutput} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="output-link"
+                            >
+                              Open Generated Content
+                            </a>
+                          ) : (
+                            <div className="text-output-content">{execution.extractedOutput}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
+                  )}
+                </React.Fragment>
+              ))
+            }
+            
+            {/* Assistant message */}
+            {unit.assistantMessage && (
+              <div className="message assistant-message">
+                {unit.assistantMessage.content}
+              </div>
+            )}
           </div>
         ))}
         
