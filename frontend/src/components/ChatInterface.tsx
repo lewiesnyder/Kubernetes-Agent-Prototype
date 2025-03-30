@@ -337,6 +337,8 @@ const ChatInterface: React.FC = () => {
   // Update the event handler to accept the conversation ID
   const handleEventReceived = (event: ResponseEvent, currentConversationId: number) => {
     const { type, data, stage } = event;
+    
+    console.log("Event received:", type, stage, data.substring(0, 100));
 
     if (stage === EventStage.CompletionEvent) {
       // Update both the state and the ref for streamed response
@@ -351,23 +353,44 @@ const ChatInterface: React.FC = () => {
         setCurrentToolCall(null);
       }
     } 
-    else if (stage === EventStage.ToolCallEvent) {
+    else if (type === EventType.ToolCall || stage === EventStage.ToolCallEvent || stage === EventStage.ToolCall) {
       try {
+        console.log("Tool call detected:", data);
         const toolData: ToolCallData = JSON.parse(data);
         setCurrentToolCall(toolData.name);
         
         // Add tool call to the list of tool calls with the current conversation ID
-        setToolCalls(prev => [
-          ...prev, 
-          { 
-            id: `tool-${Date.now()}-${prev.length}`, // Add timestamp for uniqueness 
-            name: toolData.name, 
-            args: toolData.args,
-            conversationId: currentConversationId
+        console.log("Tool call parsed:", toolData);
+        
+        // Try to parse the nested args 
+        let parsedArgs = toolData.args;
+        try {
+          // Check if the args is a JSON string and parse it
+          const argsObj = JSON.parse(toolData.args);
+          // Format code and dependencies if they exist
+          if (argsObj.code || argsObj.dependencies) {
+            parsedArgs = JSON.stringify({
+              code: argsObj.code || '',
+              dependencies: argsObj.dependencies || []
+            });
           }
-        ]);
+        } catch (argsError) {
+          console.log("Tool args are not JSON or already parsed:", argsError);
+        }
+        
+        // Add the tool call to state
+        setToolCalls(prev => {
+          const newToolCall = { 
+            id: `tool-${Date.now()}-${prev.length}`,
+            name: toolData.name, 
+            args: parsedArgs,
+            conversationId: currentConversationId
+          };
+          console.log("Adding tool call to state:", newToolCall);
+          return [...prev, newToolCall];
+        });
       } catch (e) {
-        console.error('Error parsing tool call data:', e);
+        console.error('Error parsing tool call data:', e, data);
       }
     }
     else if (type === EventType.ToolOutput) {
@@ -543,28 +566,37 @@ const ChatInterface: React.FC = () => {
     
     // Then match executions and tool calls to their respective units
     if (units.length > 0) {
+      // Create a priority map for execution types
+      const executionTypePriority: Record<string, number> = {
+        'Installing Dependencies': 1,
+        'Executing Python Code': 2,
+      };
+      
+      // Tool outputs should come after code execution
+      const isToolOutput = (title: string) => title.startsWith('Tool Output:');
+      
       // Sort executions to ensure they're displayed in the correct order
       const sortedExecutions = [...executions].sort((a, b) => {
         // First by conversation ID
         if (a.conversationId !== b.conversationId) {
           return (a.conversationId || 0) - (b.conversationId || 0);
         }
-        // Then by stage (install dependencies first)
-        if (a.title !== b.title) {
-          return a.title.includes('Installing') ? -1 : 1;
+        
+        // Tool output should come last
+        if (isToolOutput(a.title) && !isToolOutput(b.title)) return 1;
+        if (!isToolOutput(a.title) && isToolOutput(b.title)) return -1;
+        
+        // If both are tool outputs or neither are tool outputs, use priorities
+        if (isToolOutput(a.title) && isToolOutput(b.title)) {
+          // Sort by ID for tool outputs (chronological order)
+          return a.id.localeCompare(b.id);
+        } else {
+          // Sort by predefined priority
+          const priorityA = executionTypePriority[a.title] || 99;
+          const priorityB = executionTypePriority[b.title] || 99;
+          return priorityA - priorityB;
         }
-        // Then by ID
-        return a.id.localeCompare(b.id);
       });
-      
-      // Create a mapping from user message index to conversation unit ID
-      const messageIndexToUnitId: Record<number, number> = {};
-      for (let i = 0; i < messages.length; i += 2) {
-        if (messages[i]?.role === 'user') {
-          const unitId = Math.floor(i / 2) + 1;
-          messageIndexToUnitId[i] = unitId;
-        }
-      }
       
       // Map from conversation ID to most recent unit that should contain its executions
       const lastUnitByConversationId: Record<number, number> = {};
@@ -579,6 +611,11 @@ const ChatInterface: React.FC = () => {
           lastUnitByConversationId[unit.id] = unit.id;
         }
       });
+      
+      // Log tool calls for debugging
+      console.log("Available tool calls:", toolCalls);
+      console.log("Current conversation ID:", currentConversationId);
+      console.log("Units:", units);
       
       // Distribute executions to appropriate conversation units
       sortedExecutions.forEach(execution => {
@@ -601,18 +638,42 @@ const ChatInterface: React.FC = () => {
       
       // Similarly for tool calls
       toolCalls.forEach(toolCall => {
+        console.log(`Processing tool call: ${toolCall.name} for conversation ${toolCall.conversationId}`);
         if (toolCall.conversationId !== undefined) {
           const targetUnitId = lastUnitByConversationId[toolCall.conversationId];
           const targetUnit = units.find(unit => unit.id === targetUnitId);
           
           if (targetUnit) {
+            console.log(`Adding tool call ${toolCall.name} to unit ${targetUnit.id}`);
             targetUnit.toolCalls.push(toolCall);
           } else if (units.length > 0) {
+            console.log(`Adding tool call ${toolCall.name} to most recent unit (fallback)`);
             units[units.length - 1].toolCalls.push(toolCall);
           }
         } else if (units.length > 0) {
+          console.log(`Adding tool call ${toolCall.name} to most recent unit (no conversation ID)`);
           units[units.length - 1].toolCalls.push(toolCall);
         }
+      });
+      
+      // For each unit, sort the executions in the desired order
+      units.forEach(unit => {
+        unit.executions.sort((a, b) => {
+          // Tool output should come last
+          if (isToolOutput(a.title) && !isToolOutput(b.title)) return 1;
+          if (!isToolOutput(a.title) && isToolOutput(b.title)) return -1;
+          
+          // If both are tool outputs or neither are tool outputs, use priorities
+          if (isToolOutput(a.title) && isToolOutput(b.title)) {
+            // Sort by ID for tool outputs (chronological order)
+            return a.id.localeCompare(b.id);
+          } else {
+            // Sort by predefined priority
+            const priorityA = executionTypePriority[a.title] || 99;
+            const priorityB = executionTypePriority[b.title] || 99;
+            return priorityA - priorityB;
+          }
+        });
       });
     }
     
@@ -662,99 +723,7 @@ const ChatInterface: React.FC = () => {
               {unit.userMessage.content}
             </div>
             
-            {/* Tool calls for this conversation */}
-            {unit.toolCalls.length > 0 && unit.toolCalls.map((tool) => (
-              <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`} defaultOpen={true}>
-                <div className="tool-call-content">
-                  <pre><code>
-                    {`### ${tool.name}\n\n\`\`\`json\n${JSON.stringify(JSON.parse(tool.args), null, 2)}\n\`\`\``}
-                  </code></pre>
-                </div>
-              </CollapsibleSection>
-            ))}
-            
-            {/* Executions for this conversation - sort to ensure install deps comes before python exec */}
-            {unit.executions.length > 0 && [...unit.executions]
-              .sort((a, b) => {
-                if (a.title.includes('Installing') && b.title.includes('Executing')) return -1;
-                if (a.title.includes('Executing') && b.title.includes('Installing')) return 1;
-                return 0;
-              })
-              .map((execution) => (
-                <React.Fragment key={execution.id}>
-                  {/* Only show sections with logs */}
-                  {execution.logs.length > 0 && (
-                    <CollapsibleSection title={execution.title} defaultOpen={true}>
-                      {execution.logs.map((log, idx) => (
-                        <OutputLog key={idx} type={log.type} content={log.content} />
-                      ))}
-                    </CollapsibleSection>
-                  )}
-                  
-                  {/* Display extracted output if available */}
-                  {execution.extractedOutput && (
-                    <div className="output-result-container">
-                      <div className="message assistant-message output-result">
-                        <h4 className="output-title">Output Result</h4>
-                        <div className="output-content-wrapper">
-                          {execution.extractedOutput.trim().startsWith('data:image/') ? (
-                            <img 
-                              src={execution.extractedOutput} 
-                              alt="Generated output" 
-                              className="output-image" 
-                            />
-                          ) : execution.extractedOutput.trim().startsWith('data:') ? (
-                            <a 
-                              href={execution.extractedOutput} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="output-link"
-                            >
-                              Open Generated Content
-                            </a>
-                          ) : (
-                            <div className="text-output-content">{execution.extractedOutput}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Display tool output if available */}
-                  {execution.toolOutput && (
-                    <div className="output-result-container">
-                      <div className="message assistant-message output-result">
-                        <h4 className="output-title">{execution.title}</h4>
-                        <div className="output-content-wrapper">
-                          {execution.toolOutput.trim().startsWith('data:image/') ? (
-                            <img 
-                              src={execution.toolOutput} 
-                              alt="Tool output" 
-                              className="output-image" 
-                            />
-                          ) : execution.toolOutput.trim().startsWith('data:') ? (
-                            <a 
-                              href={execution.toolOutput} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="output-link"
-                            >
-                              Download File
-                            </a>
-                          ) : (
-                            <div className="markdown-content">
-                              {execution.toolOutput}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </React.Fragment>
-              ))
-            }
-            
-            {/* Assistant message */}
+            {/* Assistant message - always place right after user message */}
             {unit.assistantMessage && (
               <div className="message assistant-message">
                 {unit.assistantMessage.content}
@@ -762,19 +731,229 @@ const ChatInterface: React.FC = () => {
                 {/* Display tool calls from the assistant message if available */}
                 {unit.assistantMessage.tool_calls && unit.assistantMessage.tool_calls.length > 0 && (
                   <div className="assistant-tool-calls">
-                    {unit.assistantMessage.tool_calls.map((tool) => (
-                      <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`} defaultOpen={false}>
-                        <div className="tool-call-content">
-                          <pre><code>
-                            {`### ${tool.name}\n\n\`\`\`json\n${JSON.stringify(JSON.parse(tool.args), null, 2)}\n\`\`\``}
-                          </code></pre>
-                        </div>
-                      </CollapsibleSection>
-                    ))}
+                    {unit.assistantMessage.tool_calls.map((tool) => {
+                      // Try to parse the tool arguments
+                      let args;
+                      try {
+                        args = JSON.parse(tool.args);
+                        const hasDependencies = args.dependencies && args.dependencies.length > 0;
+                        const hasCode = args.code && args.code.trim().length > 0;
+                        
+                        return (
+                          <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`} defaultOpen={true}>
+                            <div className="tool-call-content">
+                              {hasDependencies && (
+                                <>
+                                  <h5>Dependencies:</h5>
+                                  <pre><code>
+                                    {Array.isArray(args.dependencies) 
+                                      ? args.dependencies.join('\n') 
+                                      : args.dependencies}
+                                  </code></pre>
+                                </>
+                              )}
+                              
+                              {hasCode && (
+                                <>
+                                  <h5>Code:</h5>
+                                  <pre><code className="language-python">
+                                    {args.code}
+                                  </code></pre>
+                                </>
+                              )}
+                              
+                              {!hasCode && !hasDependencies && (
+                                <pre><code>
+                                  {JSON.stringify(args, null, 2)}
+                                </code></pre>
+                              )}
+                            </div>
+                          </CollapsibleSection>
+                        );
+                      } catch (e) {
+                        // Fallback to original format if parsing fails
+                        return (
+                          <CollapsibleSection key={tool.id} title={`Tool: ${tool.name}`} defaultOpen={true}>
+                            <div className="tool-call-content">
+                              <pre><code>
+                                {`### ${tool.name}\n\n\`\`\`json\n${JSON.stringify(JSON.parse(tool.args), null, 2)}\n\`\`\``}
+                              </code></pre>
+                            </div>
+                          </CollapsibleSection>
+                        );
+                      }
+                    })}
                   </div>
                 )}
               </div>
             )}
+            
+            {/* Tool calls for this conversation */}
+            {unit.toolCalls.length > 0 && (
+              <div className="tool-calls-section">
+                <h4>Tools Used ({unit.toolCalls.length})</h4>
+                {unit.toolCalls.map((tool) => {
+                  console.log("Rendering tool call:", tool);
+                  
+                  // Try to parse the tool arguments - handle potential parsing errors
+                  let parsed = false;
+                  let hasDependencies = false;
+                  let hasCode = false;
+                  let formattedCode = '';
+                  let formattedDependencies: string[] = [];
+                  let displayContent: React.ReactNode = null;
+                  
+                  try {
+                    const args = JSON.parse(tool.args);
+                    
+                    // Check if this is already processed with code/dependencies format
+                    if (typeof args.code === 'string' || (args.dependencies && args.dependencies.length)) {
+                      parsed = true;
+                      hasDependencies = !!args.dependencies?.length;
+                      hasCode = !!args.code?.trim();
+                      formattedCode = args.code || '';
+                      formattedDependencies = Array.isArray(args.dependencies) ? args.dependencies : [args.dependencies];
+                      
+                      displayContent = (
+                        <>
+                          {hasDependencies && (
+                            <>
+                              <h5>Dependencies:</h5>
+                              <pre><code>
+                                {formattedDependencies.join('\n')}
+                              </code></pre>
+                            </>
+                          )}
+                          
+                          {hasCode && (
+                            <>
+                              <h5>Code:</h5>
+                              <pre><code className="language-python">
+                                {formattedCode}
+                              </code></pre>
+                            </>
+                          )}
+                        </>
+                      );
+                    } else {
+                      // If it doesn't match our expected format, just show the JSON
+                      parsed = true;
+                      displayContent = (
+                        <>
+                          <h5>Arguments:</h5>
+                          <pre><code>
+                            {JSON.stringify(args, null, 2)}
+                          </code></pre>
+                        </>
+                      );
+                    }
+                  } catch (e) {
+                    console.warn("Could not parse tool args as JSON:", e);
+                    // Just display raw string if all else fails
+                    displayContent = (
+                      <>
+                        <h5>Raw Arguments:</h5>
+                        <pre><code>
+                          {String(tool.args)}
+                        </code></pre>
+                      </>
+                    );
+                  }
+                  
+                  return (
+                    <CollapsibleSection key={tool.id} title={`${tool.name}`} defaultOpen={true}>
+                      <div className="tool-call-content">
+                        {displayContent}
+                      </div>
+                    </CollapsibleSection>
+                  );
+                })}
+              </div>
+            )}
+            
+            {/* Executions for this conversation - already sorted in the conversationUnits logic */}
+            {unit.executions.length > 0 && unit.executions.map((execution) => (
+              <React.Fragment key={execution.id}>
+                {/* Only show sections with logs */}
+                {execution.logs.length > 0 && (
+                  <CollapsibleSection title={execution.title} defaultOpen={true}>
+                    {execution.logs.map((log, idx) => (
+                      <OutputLog key={idx} type={log.type} content={log.content} />
+                    ))}
+                  </CollapsibleSection>
+                )}
+                
+                {/* Display extracted output if available */}
+                {execution.extractedOutput && (
+                  <div className="output-result-container">
+                    <div className="message assistant-message output-result">
+                      <h4 className="output-title">Output Result</h4>
+                      <div className="output-content-wrapper">
+                        {execution.extractedOutput.split(/\s+/).map((part, index) => {
+                          if (part.trim().startsWith('data:image/')) {
+                            return (
+                              <img 
+                                key={index}
+                                src={part} 
+                                alt="Generated output" 
+                                className="output-image" 
+                              />
+                            );
+                          } else if (part.trim().startsWith('data:')) {
+                            return (
+                              <a 
+                                key={index}
+                                href={part} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="output-link"
+                              >
+                                Open Generated Content
+                              </a>
+                            );
+                          } else {
+                            return (
+                              <span key={index} className="text-output-content">{part} </span>
+                            );
+                          }
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Display tool output if available */}
+                {execution.toolOutput && (
+                  <div className="output-result-container">
+                    <div className="message assistant-message output-result">
+                      <h4 className="output-title">{execution.title}</h4>
+                      <div className="output-content-wrapper">
+                        {execution.toolOutput.trim().startsWith('data:image/') ? (
+                          <img 
+                            src={execution.toolOutput} 
+                            alt="Tool output" 
+                            className="output-image" 
+                          />
+                        ) : execution.toolOutput.trim().startsWith('data:') ? (
+                          <a 
+                            href={execution.toolOutput} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="output-link"
+                          >
+                            Download File
+                          </a>
+                        ) : (
+                          <div className="markdown-content">
+                            {execution.toolOutput}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
           </div>
         ))}
         
@@ -818,8 +997,17 @@ const ChatInterface: React.FC = () => {
           {isLoading ? <div className="spinner"></div> : 'Send'}
         </button>
       </form>
-    </div>
       
+      <div className="sample-prompts">
+        <h4>Sample Prompts:</h4>
+        <ul>
+          <li onClick={() => setInput("solve collatz conjecture for 134958712379418239412")}>"solve collatz conjecture for 134958712379418239412"</li>
+          <li onClick={() => setInput("calculate pi to 1000000 digits")}>"calculate pi to 1000000 digits"</li>
+          <li onClick={() => setInput("create a csv with some test data with columns: first_name, last_name, dob, state, city")}>"create a csv with some test data with columns: first_name, last_name, dob, state, city"</li>
+          <li onClick={() => setInput("generate a pulsing square that changes color")}>"generate a pulsing square that changes color"</li>
+        </ul>
+      </div>
+    </div>
     <div className={`config-panel ${isConfigPanelOpen ? 'open' : 'closed'}`}>
       <div className="config-panel-header" onClick={() => setIsConfigPanelOpen(!isConfigPanelOpen)}>
         <h3>Configure</h3>
@@ -883,7 +1071,7 @@ const ChatInterface: React.FC = () => {
       </div>
     </div>
   </div>
-  );
+);
 };
 
 export default ChatInterface;

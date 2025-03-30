@@ -27,6 +27,7 @@ export interface ToolCallData {
 export enum EventStage {
   CompletionEvent = "completion_event",
   ToolCallEvent = "tool_call_event",
+  ToolCall = "tool_call",
   InstallDependencies = "install_dependencies",
   ExecutePython = "execute_python",
   StdoutEvent = "stdout_event",

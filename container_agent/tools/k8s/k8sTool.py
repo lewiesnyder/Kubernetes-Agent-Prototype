@@ -222,20 +222,21 @@ class K8sTool:
                 if '%%START_OUTPUT%%' in chunk['data']:
                     capturing_output = True
                     output_buffer += chunk['data'].split('%%START_OUTPUT%%', 1)[1]
-                    continue
+                    # continue
 
                 if capturing_output:
                     if '%%END_OUTPUT%%' in chunk['data']:
                         output_buffer += chunk['data'].split('%%END_OUTPUT%%', 1)[0]
-                        yield {'type': 'tool_output', 'data': output_buffer, 'stage': 'execute_python'}
+                        yield {'type': 'tool_output', 'data': output_buffer.replace('%%START_OUTPUT%%', '').replace('%%END_OUTPUT%%', ''), 'stage': 'execute_python'}
                         output_buffer = ""
                         capturing_output = False
                     else:
                         output_buffer += chunk['data']
                     continue
 
-            chunk['stage'] = 'execute_python'
-            yield chunk
+                if '%%START_OUTPUT%%' not in chunk['data'] and not capturing_output:
+                    chunk['stage'] = 'execute_python'
+                    yield chunk['data'].replace('%%START_OUTPUT%%', '').replace('%%END_OUTPUT%%', '')
         
         
     @staticmethod

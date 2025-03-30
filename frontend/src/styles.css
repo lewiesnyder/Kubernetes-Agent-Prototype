@@ -143,6 +143,65 @@
   padding-top: 8px;
 }
 
+.tool-calls-section {
+  margin: 15px 0;
+  padding: 12px 15px;
+  background-color: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tool-calls-section h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #4b5563;
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.tool-call-content {
+  max-height: 500px;
+  overflow-y: auto;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 5px;
+  border: 1px solid #e5e7eb;
+}
+
+.tool-call-content h5 {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  color: #4a5568;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px dashed #cbd5e0;
+  padding-bottom: 4px;
+}
+
+.tool-call-content pre {
+  margin: 0;
+  white-space: pre-wrap;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 12px;
+  border: 1px solid #edf2f7;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tool-call-content code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  tab-size: 2;
+}
+
+.tool-call-content code.language-python {
+  color: #0366d6;
+}
+
 .history-panel-header {
   padding: 15px;
   background-color: #f0f0f0;
@@ -923,4 +982,47 @@
 
 .temperature-badge {
   color: #777;
+}
+
+.sample-prompts {
+  margin: 15px 0;
+  padding: 8px 15px;
+  background-color: #f0f8ff;
+  border: 1px solid #d1e7ff;
+  border-radius: 8px;
+}
+
+.sample-prompts h4 {
+  margin-top: 5px;
+  margin-bottom: 8px;
+  color: #0056b3;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sample-prompts ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sample-prompts li {
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background-color: white;
+  border: 1px solid #e1e8ed;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.sample-prompts li:hover {
+  background-color: #e8f4fd;
+  border-color: #a8d1ff;
+  transform: translateY(-1px);
+}
+
+.sample-prompts li:last-child {
+  margin-bottom: 5px;
 }
