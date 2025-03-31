@@ -19,7 +19,8 @@ class K8sTool:
     default_pod_spec = {
         "containers": [{
             "name": "agent-runner",
-            "image": "python:3.11",
+            # "image": "python:3.11",
+            "image": "jupyter/datascience-notebook",
             "command": ['sleep', 'infinity']
         }],
         "restartPolicy": "Always"
