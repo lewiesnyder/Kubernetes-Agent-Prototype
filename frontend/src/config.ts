@@ -24,41 +24,53 @@ export const MODELS: ModelOption[] = [
     provider: "Anthropic",
     description: "Fast and efficient Claude model"
   },
-  {
-    id: "ollama_chat/deepseek-r1:32b",
-    name: "DeepSeek R1 32B",
-    provider: "Ollama",
-    description: "Advanced reasoning model from DeepSeek"
-  },
-  {
-    id: "ollama_chat/llama3.2:latest",
-    name: "Llama 3.2",
-    provider: "Ollama",
-    description: "Latest Llama model from Meta"
-  },
-  {
-    id: "ollama_chat/llama3-groq-tool-use:8b",
-    name: "Llama 3 Groq Tool Use",
-    provider: "Ollama",
-    description: "Llama 3 with Groq's tool use capabilities"
-  },
-  {
-    id: "ollama_chat/medragondot/Sky-T1-32B-Preview:latest",
-    name: "Sky T1 32B Preview",
-    provider: "Ollama",
-    description: "Sky T1 32B Preview model from Medragondot"
-  },
-  {
-    id: "ollama_chat/llama3.1:latest",
-    name: "Llama 3.1",
-    provider: "Ollama",
-    description: "Llama 3.1 model from Meta"
-  },
+  // {
+  //   id: "ollama_chat/deepseek-r1:32b",
+  //   name: "DeepSeek R1 32B",
+  //   provider: "Ollama",
+  //   description: "Advanced reasoning model from DeepSeek"
+  // },
+  // {
+  //   id: "ollama_chat/llama3.2:latest",
+  //   name: "Llama 3.2",
+  //   provider: "Ollama",
+  //   description: "Latest Llama model from Meta"
+  // },
+  // {
+  //   id: "ollama_chat/llama3-groq-tool-use:8b",
+  //   name: "Llama 3 Groq Tool Use",
+  //   provider: "Ollama",
+  //   description: "Llama 3 with Groq's tool use capabilities"
+  // },
+  // {
+  //   id: "ollama_chat/medragondot/Sky-T1-32B-Preview:latest",
+  //   name: "Sky T1 32B Preview",
+  //   provider: "Ollama",
+  //   description: "Sky T1 32B Preview model from Medragondot"
+  // },
+  // {
+  //   id: "ollama_chat/llama3.1:latest",
+  //   name: "Llama 3.1",
+  //   provider: "Ollama",
+  //   description: "Llama 3.1 model from Meta"
+  // },
   {
     id: "openai/gpt-4o",
     name: "GPT-4o",
     provider: "OpenAI",
     description: "Latest GPT model from OpenAI"
+  },
+  {
+    id: "openrouter/google/gemini-2.5-pro-exp-03-25:free",
+    name: "Gemini 2.5 Pro - free",
+    provider: "OpenRouter",
+    description: "free Gemini model from OpenRouter"
+  },
+  {
+    id: "openrouter/google/gemini-2.0-pro-exp-02-05:free",
+    name: "Google: Gemini Pro 2.0 Experimental (free)",
+    provider: "OpenRouter",
+    description: "free Gemini model from OpenRouter"
   }
 ];
 
