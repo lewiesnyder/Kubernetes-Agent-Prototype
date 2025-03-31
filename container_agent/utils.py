@@ -41,13 +41,45 @@ def docstring_to_openai_spec(func: Callable) -> Dict:
         args_section = sections[args_index]
         for line in args_section.strip().split('\n'):
             match = re.match(r'\s*(\w+)\s*\(([\w\[\], ]+)\):\s*(.*)', line)
+            items = None
             if match:
                 name, type_, desc = match.groups()
+                # Convert Python type hints to JSON schema types
+                json_type = "string"
+                if "int" in type_.lower():
+                    json_type = "integer"
+                elif "float" in type_.lower() or "number" in type_.lower():
+                    json_type = "number"
+                elif "bool" in type_.lower():
+                    json_type = "boolean"
+                elif "list" in type_.lower() or "array" in type_.lower():
+                    json_type = "array"
+                    # Extract element type for arrays
+                    element_type = "string"  # Default to string
+                    element_match = re.search(r'list\[(\w+)\]', type_)
+                    if element_match:
+                        elem_type = element_match.group(1).lower()
+                        if "int" in elem_type:
+                            element_type = "integer"
+                        elif "float" in elem_type or "number" in elem_type:
+                            element_type = "number"
+                        elif "bool" in elem_type:
+                            element_type = "boolean"
+                        elif "dict" in elem_type or "object" in elem_type:
+                            element_type = "object"
+                        # Add items property for array type
+                        items = {"type": element_type}
+                elif "dict" in type_.lower() or "object" in type_.lower():
+                    json_type = "object"
+
                 spec['function']["parameters"]["properties"][name] = {
-                    "type": type_,
-                    "description": desc.strip()
+                    "type": json_type,
+                    "description": desc.strip(),
+                    **({"items": items} if items else {})
                 }
-                spec['function']["parameters"]["required"].append(name)  # TODO: omit optional parameters
+                # Check if parameter is optional
+                if "Optional" not in type_ and "optional" not in desc.lower():
+                    spec['function']["parameters"]["required"].append(name)
     
     # Process return value
     if 'Returns' in sections:
