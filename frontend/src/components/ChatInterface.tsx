@@ -318,6 +318,9 @@ const ChatInterface: React.FC = () => {
         
         setStreamedResponse('');
         currentResponseRef.current = '';
+        
+        // Ensure any remaining tool call indicator is cleared
+        setCurrentToolCall(null);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -397,6 +400,10 @@ const ChatInterface: React.FC = () => {
       // Handle tool_output type events - add to the current execution
       const executionStage = `Tool Output: ${stage}`;
       
+      // Clear the current tool call indicator when we get a tool output
+      // This signals that the tool has finished executing
+      setCurrentToolCall(null);
+      
       setExecutions(prev => {
         // Generate a stable execution ID for tool output
         const executionKey = `tool-output-${stage}-${currentConversationId}`;
@@ -441,6 +448,12 @@ const ChatInterface: React.FC = () => {
       // Process the data for delimiters if it's Python execution
       let processedData = data;
       let extractedOutput: string | null = null;
+      
+      // If data contains END_OUTPUT, tool execution is probably complete
+      if (data.includes("%%END_OUTPUT%%") || 
+          (stage === EventStage.ExecutePython && type === EventType.Stderr && data.includes("exited with code"))) {
+        setCurrentToolCall(null);
+      }
       
       if (stage === EventStage.ExecutePython) {
         // Check for delimiters in the data
@@ -562,6 +575,11 @@ const ChatInterface: React.FC = () => {
           toolCalls: []
         });
       }
+    }
+    
+    // Log active tool calls for debugging
+    if (currentToolCall) {
+      console.log("Active tool call:", currentToolCall);
     }
     
     // Then match executions and tool calls to their respective units
@@ -729,7 +747,7 @@ const ChatInterface: React.FC = () => {
                 {unit.assistantMessage.content}
                 
                 {/* Display tool calls from the assistant message if available */}
-                {unit.assistantMessage.tool_calls && unit.assistantMessage.tool_calls.length > 0 && (
+                {/* {unit.assistantMessage.tool_calls && unit.assistantMessage.tool_calls.length > 0 && (
                   <div className="assistant-tool-calls">
                     {unit.assistantMessage.tool_calls.map((tool) => {
                       // Try to parse the tool arguments
@@ -784,7 +802,7 @@ const ChatInterface: React.FC = () => {
                       }
                     })}
                   </div>
-                )}
+                )} */}
               </div>
             )}
             

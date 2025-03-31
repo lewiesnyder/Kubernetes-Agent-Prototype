@@ -12,7 +12,10 @@ const ThinkingIndicator: React.FC<ThinkingIndicatorProps> = ({ toolName }) => {
         <div className="thinking-dot"></div>
         <div className="thinking-dot"></div>
       </div>
-      <span style={{ marginLeft: '10px' }}>Executing tool: {toolName}</span>
+      <div className="thinking-text">
+        <span className="tool-execution-label">Executing tool:</span>
+        <span className="tool-name">{toolName}</span>
+      </div>
     </div>
   );
 };
