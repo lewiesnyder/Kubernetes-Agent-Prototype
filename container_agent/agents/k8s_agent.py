@@ -1,15 +1,22 @@
 import litellm
+import logging
 import ujson as json
 
 from typing import AsyncGenerator
 from container_agent.models import ChatRequest, Message, ResponseEvent, ResponseEvents
 from container_agent.tools.k8s import execute_python_in_k8s
 from container_agent.utils import docstring_to_anthropic_spec, docstring_to_openai_spec
+from litellm import ModelResponse
 
+# litellm._turn_on_debug()
+
+logger = logging.getLogger(__name__)
 
 class K8sAgent:
 
     async def chat(self, chat_request:ChatRequest) -> AsyncGenerator[ResponseEvent, None]:
+
+        # TODO: catch errors
         resp = litellm.completion(
             model=chat_request.model,
             messages=[message.model_dump() for message in chat_request.messages],
