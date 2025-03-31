@@ -217,41 +217,70 @@ class K8sTool:
             python_code (str): The python code to execute.
         """
         K8sTool.logger.info(f"Executing python code in pod {pod_name}")
-        # escaped = python_code.replace("'", "\\'").replace('\\n', '\\r')
-        escaped = python_code
         output_buffer = ""
         capturing_output = False
 
-        async for chunk in K8sTool.execute_command_async(pod_name=pod_name, exec_cmd=['python', '-c', f'{escaped}'], ns=ns):
+        async for chunk in K8sTool.execute_command_async(pod_name=pod_name, exec_cmd=['python', '-c', f'{python_code}'], ns=ns):
             chunk['stage'] = 'execute_python'
             print(chunk)
             if chunk['type'] == 'stdout':
-                if _start_delimiter in chunk['data']:
+                # Case 1: Start delimiter found in this chunk
+                if _start_delimiter in chunk['data'] and not capturing_output:
                     capturing_output = True
-                    output_buffer += chunk['data'].split(_start_delimiter, 1)[1]
-                    # continue
-
-                if capturing_output:
-                    if _end_delimiter in chunk['data']:
-                        output_buffer += chunk['data'].split(_end_delimiter, 1)[0]
+                    # Only take the part after the delimiter
+                    output_buffer = chunk['data'].split(_start_delimiter, 1)[1]
+                    
+                    # If end delimiter is also in this chunk, process and yield immediately
+                    if _end_delimiter in output_buffer:
+                        final_output = output_buffer.split(_end_delimiter, 1)[0]
                         yield {
                             'type': 'tool_output', 
-                            'data': output_buffer.replace(_start_delimiter, '').replace(_end_delimiter, ''), 
+                            'data': final_output, 
                             'stage': 'execute_python'
                         }
                         output_buffer = ""
                         capturing_output = False
-                    else:
-                        output_buffer += chunk['data']
-                    # continue
-
-                if _start_delimiter not in chunk['data'] and not capturing_output:
+                        
+                        # If there's content after the end delimiter, yield it separately
+                        remaining = chunk['data'].split(_end_delimiter, 1)[1]
+                        if remaining:
+                            yield {
+                                'type': 'stdout',
+                                'data': remaining,
+                                'stage': 'execute_python'
+                            }
+                # Case 2: Already capturing and found end delimiter
+                elif capturing_output and _end_delimiter in chunk['data']:
+                    # Add only the part before the end delimiter
+                    output_buffer += chunk['data'].split(_end_delimiter, 1)[0]
                     yield {
-                        'type': chunk['type'],
-                        'data': chunk['data'].replace(_start_delimiter, '').replace(_end_delimiter, ''),
+                        'type': 'tool_output', 
+                        'data': output_buffer, 
+                        'stage': 'execute_python'
+                    }
+                    output_buffer = ""
+                    capturing_output = False
+                    
+                    # If there's content after the end delimiter, yield it separately
+                    remaining = chunk['data'].split(_end_delimiter, 1)[1]
+                    if remaining:
+                        yield {
+                            'type': 'stdout',
+                            'data': remaining,
+                            'stage': 'execute_python'
+                        }
+                # Case 3: In the middle of capturing output
+                elif capturing_output:
+                    output_buffer += chunk['data']
+                # Case 4: Regular stdout, not capturing special output
+                elif not capturing_output:
+                    yield {
+                        'type': 'stdout',
+                        'data': chunk['data'],
                         'stage': 'execute_python'
                     }
             else:
+                # Pass through non-stdout chunks (like stderr)
                 yield chunk
         
     @staticmethod
