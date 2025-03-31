@@ -5,6 +5,10 @@ from typing import AsyncGenerator
 from kubernetes import client, config, stream
 from kubernetes.client.models.v1_pod import V1Pod
 
+# TODO: refactor to agent to remove all occurances before sending to UI
+_start_delimiter = '%%START_OUTPUT%%'
+_end_delimiter = '%%END_OUTPUT%%'
+
 class K8sTool:
     """
     A tool for interacting with a kubernetes cluster.
@@ -218,26 +222,36 @@ class K8sTool:
         capturing_output = False
 
         async for chunk in K8sTool.execute_command_async(pod_name=pod_name, exec_cmd=['python', '-c', f'{escaped}'], ns=ns):
+            chunk['stage'] = 'execute_python'
+            print(chunk)
             if chunk['type'] == 'stdout':
-                if '%%START_OUTPUT%%' in chunk['data']:
+                if _start_delimiter in chunk['data']:
                     capturing_output = True
-                    output_buffer += chunk['data'].split('%%START_OUTPUT%%', 1)[1]
+                    output_buffer += chunk['data'].split(_start_delimiter, 1)[1]
                     # continue
 
                 if capturing_output:
-                    if '%%END_OUTPUT%%' in chunk['data']:
-                        output_buffer += chunk['data'].split('%%END_OUTPUT%%', 1)[0]
-                        yield {'type': 'tool_output', 'data': output_buffer.replace('%%START_OUTPUT%%', '').replace('%%END_OUTPUT%%', ''), 'stage': 'execute_python'}
+                    if _end_delimiter in chunk['data']:
+                        output_buffer += chunk['data'].split(_end_delimiter, 1)[0]
+                        yield {
+                            'type': 'tool_output', 
+                            'data': output_buffer.replace(_start_delimiter, '').replace(_end_delimiter, ''), 
+                            'stage': 'execute_python'
+                        }
                         output_buffer = ""
                         capturing_output = False
                     else:
                         output_buffer += chunk['data']
-                    continue
+                    # continue
 
-                if '%%START_OUTPUT%%' not in chunk['data'] and not capturing_output:
-                    chunk['stage'] = 'execute_python'
-                    yield chunk['data'].replace('%%START_OUTPUT%%', '').replace('%%END_OUTPUT%%', '')
-        
+                if _start_delimiter not in chunk['data'] and not capturing_output:
+                    yield {
+                        'type': chunk['type'],
+                        'data': chunk['data'].replace(_start_delimiter, '').replace(_end_delimiter, ''),
+                        'stage': 'execute_python'
+                    }
+            else:
+                yield chunk
         
     @staticmethod
     def install_dependencies(pod_name: str, libraries: list[str], ns: str = 'default') -> str:
