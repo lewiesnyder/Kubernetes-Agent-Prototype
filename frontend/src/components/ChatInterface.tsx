@@ -1038,8 +1038,8 @@ const ChatInterface: React.FC = () => {
         <ul>
           <li onClick={() => setInput("solve collatz conjecture for 134958712379418239412")}>"solve collatz conjecture for 134958712379418239412"</li>
           <li onClick={() => setInput("calculate pi to 1000000 digits")}>"calculate pi to 1000000 digits"</li>
-          <li onClick={() => setInput("create a csv with some test data with columns: first_name, last_name, dob, state, city")}>"create a csv with some test data with columns: first_name, last_name, dob, state, city"</li>
-          <li onClick={() => setInput("Print Hello World")}>"Print Hello World"</li>
+          <li onClick={() => setInput("create a csv with some test data with columns: first_name, last_name, dob, state, city for me to download")}>"create a csv with some test data with columns: first_name, last_name, dob, state, city for me to download"</li>
+          <li onClick={() => setInput("Create an animated gif of a pulsing circle")}>"Create an animated gif of a pulsing circle"</li>
         </ul>
       </div>
     </div>
