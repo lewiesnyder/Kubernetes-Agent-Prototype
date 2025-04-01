@@ -4,7 +4,7 @@ import ujson as json
 
 from typing import AsyncGenerator
 from container_agent.models import ChatRequest, Message, ResponseEvent, ResponseEvents
-from container_agent.tools.k8s import execute_python_in_k8s
+from container_agent.tools.k8s import execute_python_in_k8s, k8sTool
 from container_agent.utils import docstring_to_anthropic_spec, docstring_to_openai_spec
 from litellm import ModelResponse
 
@@ -28,7 +28,6 @@ class K8sAgent:
         tool_calls: dict[int, dict[str, str]] = {}
 
         for chunk in resp:
-            # print(chunk)
             for choice in chunk.choices:
                 if hasattr(choice, 'delta'):
                     if hasattr(choice.delta, 'content') and choice.delta.content:
@@ -44,6 +43,7 @@ class K8sAgent:
 
         if len(tool_calls) > 0:
             for tool_call in tool_calls.values():
-                yield ResponseEvent(type='tool_call', data=json.dumps(tool_call), stage='tool_call').model_dump_json()
+                # TODO: refactor output delimiter replacement hack
+                yield ResponseEvent(type='tool_call', data=json.dumps(tool_call), stage='tool_call').model_dump_json().replace(k8sTool._start_delimiter, '').replace(k8sTool._end_delimiter, '')
                 async for event in globals().get(tool_call['name'])(**json.loads(tool_call['args'])):
-                    yield ResponseEvent.model_validate(event).model_dump_json()
+                    yield ResponseEvent.model_validate(event).model_dump_json().replace(k8sTool._start_delimiter, '').replace(k8sTool._end_delimiter, '')

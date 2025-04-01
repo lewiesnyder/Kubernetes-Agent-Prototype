@@ -222,7 +222,6 @@ class K8sTool:
 
         async for chunk in K8sTool.execute_command_async(pod_name=pod_name, exec_cmd=['python', '-c', f'{python_code}'], ns=ns):
             chunk['stage'] = 'execute_python'
-            print(chunk)
             if chunk['type'] == 'stdout':
                 # Case 1: Start delimiter found in this chunk
                 if _start_delimiter in chunk['data'] and not capturing_output:
