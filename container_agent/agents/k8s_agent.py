@@ -13,6 +13,7 @@ from litellm import ModelResponse
 logger = logging.getLogger(__name__)
 
 class K8sAgent:
+    # TODO: have the agent read the output of the tool to fix issues in the event of an error
 
     async def chat(self, chat_request:ChatRequest) -> AsyncGenerator[ResponseEvent, None]:
 
