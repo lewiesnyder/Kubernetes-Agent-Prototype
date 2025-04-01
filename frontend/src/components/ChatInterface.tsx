@@ -946,21 +946,36 @@ const ChatInterface: React.FC = () => {
                     <div className="message assistant-message output-result">
                       <h4 className="output-title">{execution.title}</h4>
                       <div className="output-content-wrapper">
-                        {execution.toolOutput.trim().startsWith('data:image/') ? (
-                          <img 
-                            src={execution.toolOutput} 
-                            alt="Tool output" 
-                            className="output-image" 
-                          />
-                        ) : execution.toolOutput.trim().startsWith('data:') ? (
-                          <a 
-                            href={execution.toolOutput} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="output-link"
-                          >
-                            Download File
-                          </a>
+                        {execution.toolOutput.trim().includes('data:') ? (
+                          // Split by spaces and process each part for potential data URLs
+                          execution.toolOutput.split(/\s+/).map((part, index) => {
+                            if (part.trim().startsWith('data:image/')) {
+                              return (
+                                <img 
+                                  key={index}
+                                  src={part} 
+                                  alt="Tool output" 
+                                  className="output-image" 
+                                />
+                              );
+                            } else if (part.trim().startsWith('data:')) {
+                              return (
+                                <a 
+                                  key={index}
+                                  href={part} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="output-link"
+                                >
+                                  Download File
+                                </a>
+                              );
+                            } else {
+                              return (
+                                <span key={index} className="text-output-content">{part} </span>
+                              );
+                            }
+                          })
                         ) : (
                           <div className="markdown-content">
                             {execution.toolOutput}
@@ -1022,7 +1037,7 @@ const ChatInterface: React.FC = () => {
           <li onClick={() => setInput("solve collatz conjecture for 134958712379418239412")}>"solve collatz conjecture for 134958712379418239412"</li>
           <li onClick={() => setInput("calculate pi to 1000000 digits")}>"calculate pi to 1000000 digits"</li>
           <li onClick={() => setInput("create a csv with some test data with columns: first_name, last_name, dob, state, city")}>"create a csv with some test data with columns: first_name, last_name, dob, state, city"</li>
-          <li onClick={() => setInput("generate a pulsing square that changes color")}>"generate a pulsing square that changes color"</li>
+          <li onClick={() => setInput("Print Hello World")}>"Print Hello World"</li>
         </ul>
       </div>
     </div>
