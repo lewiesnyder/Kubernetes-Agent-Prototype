@@ -907,34 +907,39 @@ const ChatInterface: React.FC = () => {
                     <div className="message assistant-message output-result">
                       <h4 className="output-title">Output Result</h4>
                       <div className="output-content-wrapper">
-                        {execution.extractedOutput.split(/\s+/).map((part, index) => {
-                          if (part.trim().startsWith('data:image/')) {
-                            return (
-                              <img 
-                                key={index}
-                                src={part} 
-                                alt="Generated output" 
-                                className="output-image" 
-                              />
-                            );
-                          } else if (part.trim().startsWith('data:')) {
-                            return (
-                              <a 
-                                key={index}
-                                href={part} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="output-link"
-                              >
-                                Open Generated Content
-                              </a>
-                            );
-                          } else {
-                            return (
-                              <span key={index} className="text-output-content">{part} </span>
-                            );
-                          }
-                        })}
+                        {execution.extractedOutput.includes('data:') ? (
+                          // Handle data URLs (images and other files)
+                          execution.extractedOutput.split(/\s+/).map((part, index) => {
+                            if (part.trim().startsWith('data:image/')) {
+                              return (
+                                <img 
+                                  key={index}
+                                  src={part} 
+                                  alt="Generated output" 
+                                  className="output-image" 
+                                />
+                              );
+                            } else if (part.trim().startsWith('data:')) {
+                              return (
+                                <a 
+                                  key={index}
+                                  href={part} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="output-link"
+                                >
+                                  Open Generated Content
+                                </a>
+                              );
+                            }
+                            return null;
+                          })
+                        ) : (
+                          // Display text content as a single formatted block
+                          <pre className="text-output-content">
+                            {execution.extractedOutput}
+                          </pre>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -945,7 +950,7 @@ const ChatInterface: React.FC = () => {
                   <div className="output-result-container">
                     <div className="message assistant-message output-result">
                       <h4 className="output-title">{execution.title}</h4>
-                      <div className="output-content-wrapper">
+                      <div className="output-content-wrapper text-output-content">
                         {execution.toolOutput.trim().includes('data:') ? (
                           // Split by spaces and process each part for potential data URLs
                           execution.toolOutput.split(/\s+/).map((part, index) => {
@@ -963,16 +968,13 @@ const ChatInterface: React.FC = () => {
                                 <a 
                                   key={index}
                                   href={part} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="output-link"
                                 >
                                   Download File
                                 </a>
                               );
                             } else {
                               return (
-                                <span key={index} className="text-output-content">{part} </span>
+                                <span key={index} >{part} </span>
                               );
                             }
                           })
